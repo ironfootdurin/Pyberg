@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 import time
 import find
-import bcrypt
+from passlib.hash import bcrypt
 
 def connect():
     with sqlite3.connect('user_info.db') as conn:
@@ -37,7 +37,7 @@ def login(username, password):
                 SELECT password FROM user_login
                     WHERE username = ?''', (username, ))
             correct_password = cursor.fetchone()
-            if bcrypt.checkpw(password.encode(), correct_password[0].encode()):
+            if bcrypt.verify(password, correct_password[0]):
                 return True
             else:
                 return False
@@ -55,7 +55,7 @@ def create(username, password):
         if user_exists:
             return False
         else:
-            password_hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+            password_hashed = bcrypt.hash(password)
             cursor.execute('''INSERT OR IGNORE INTO user_login
                 (username, password, cash) VALUES
                     (?, ?, 100000)''', (username, password_hashed.decode() ))
