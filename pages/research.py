@@ -6,6 +6,7 @@ class ResearchPage():
     def __init__(self):
         self.ticker_data = {}
         ui.button('Run Bot', on_click=self.run_bot).classes('w-full bg-info text-white py-2')
+        ui.link('Update Table', '/update', new_tab=True)
     def run_bot(self):
         print('button clicked')
         

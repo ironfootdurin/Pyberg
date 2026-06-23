@@ -4,6 +4,7 @@ from nicegui import app, ui
 import user
 import asyncio
 from pathlib import Path
+import weekly_running
 
 @ui.page('/company/{ticker}')
 def company_page(ticker):
@@ -55,6 +56,15 @@ def home_page():
 def signup_page():
     Theme()
     SignUpPage()
+
+@ui.page('/update')
+async def update_page():
+    ui.label('Updating Stock Data...')
+    spinner = ui.spinner()
+    chosen = await asyncio.to_thread(weekly_running.setup_stocks)
+    weekly_running.save_data(chosen)
+    spinner.delete()
+    ui.label('Update Complete')
     
 @ui.page('/')
 def login_page():
