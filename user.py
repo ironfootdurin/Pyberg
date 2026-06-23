@@ -4,7 +4,8 @@ import pandas as pd
 from datetime import datetime
 import time
 import find
-from passlib.hash import bcrypt
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 
 def connect():
     with sqlite3.connect('user_info.db') as conn:
@@ -29,6 +30,7 @@ def connect():
         conn.commit()
 
 def login(username, password):
+    ph = PasswordHasher()
     time.sleep(0.25) #To avoid hacker spamming too quickly
     with sqlite3.connect('user_info.db') as conn:
         cursor = conn.cursor()
@@ -37,15 +39,18 @@ def login(username, password):
                 SELECT password FROM user_login
                     WHERE username = ?''', (username, ))
             correct_password = cursor.fetchone()
-            if bcrypt.verify(password, correct_password[0]):
+            try:
+                ph.verify( correct_password[0], password)
                 return True
-            else:
+            except VerifyMismatchError:
+                print('Wrong Password')
                 return False
             
         except Exception as e:
             return False
 
 def create(username, password):
+    ph = PasswordHasher()
     with sqlite3.connect('user_info.db') as conn:
         cursor = conn.cursor()
         cursor.execute('''
@@ -55,10 +60,10 @@ def create(username, password):
         if user_exists:
             return False
         else:
-            password_hashed = bcrypt.hash(password)
+            password_hashed = ph.hash(password)
             cursor.execute('''INSERT OR IGNORE INTO user_login
                 (username, password, cash) VALUES
-                    (?, ?, 100000)''', (username, password_hashed.decode() ))
+                    (?, ?, 100000)''', (username, password_hashed))
             return True
 
 def get_cash(username):
