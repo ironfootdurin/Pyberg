@@ -71,7 +71,7 @@ async def forward_update(client):
             await client.connected()
             ui.notify('Update already in progress')
         return
-    
+    print('Updating')
     async with lock:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, setup_stocks)
@@ -79,6 +79,8 @@ async def forward_update(client):
     with client:
         await client.connected()
         ui.notify('Update Complete')
+        ui.label('Complete')
+        print('Finished Updating')
         
 
 
