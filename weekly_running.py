@@ -17,11 +17,11 @@ def setup_stocks():
         sp500,
         period='20d',
         group_by='ticker',
-        progress=True,
+        progress=False,
         threads=True,
         )
     for symbol in sp500:
-        print(f'Getting ticker {symbol}')
+        #print(f'Getting ticker {symbol}')
         ticker = yf.Ticker(symbol)
         history = data[symbol]
         previous_price = history['Close'].iloc[-6]
