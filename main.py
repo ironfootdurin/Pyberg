@@ -6,6 +6,8 @@ import asyncio
 from pathlib import Path
 import weekly_running
 
+lock = asyncio.Lock()
+
 @ui.page('/company/{ticker}')
 def company_page(ticker):
     if not check_login():
@@ -58,13 +60,14 @@ def signup_page():
     SignUpPage()
 
 @ui.page('/update')
-def update_page():
-    ui.label('Updater')
-    ui.label('Updating research...')
-    ui.spinner()
-    client = ui.context.client
-    asyncio.create_task(forward_update(client))
-    
+async def update_page():
+    async with lock:
+        ui.label('Updater')
+        ui.label('Updating research...')
+        ui.spinner()
+        client = ui.context.client
+        asyncio.create_task(forward_update(client))
+        
 @ui.page('/')
 def login_page():
     Theme()
