@@ -1,5 +1,6 @@
 from nicegui import app, ui, Client
 from report import get_quarterly
+from weekly_running import setup_stocks
 import os
 import threading
 import find
@@ -62,6 +63,16 @@ async def forward_quarterly(ticker, client):
         else:
             ui.navigate.to(f'/reports/{path}')
             ui.timer(5, lambda: path.unlink(missing_ok=True), once=True)
+            
+async def forward_update(client):
+    loop = asyncio.get_event_loop()
+    path = await loop.run_in_executor(None, setup_stocks)
+
+    with client:
+        await client.connected()
+        
+
+
 
         
 

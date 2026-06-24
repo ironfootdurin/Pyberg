@@ -31,7 +31,8 @@ def setup_stocks():
         prices.append((symbol, change, weight))
         
     chosen_stocks = sorted(prices, key=lambda price: price[1], reverse=True)[:15]
-    return chosen_stocks
+    save_data(chosen_stocks)
+    return True
 
 def save_data(chosen_stocks):
     
@@ -56,8 +57,7 @@ def retrieve_data():
         return data
 
 if __name__ == '__main__':
-    chosen_stocks = setup_stocks()
-    save_data(chosen_stocks)
+    setup_stocks()
         
 
     

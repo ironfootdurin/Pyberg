@@ -1,5 +1,5 @@
 from pages import NavBar, CompanyCard, HomePage, LoginPage, SignUpPage, CashFlowPage, ResearchPage
-from pages.misc import check_login, Theme, start_updater, forward_quarterly
+from pages.misc import check_login, Theme, start_updater, forward_quarterly, forward_update
 from nicegui import app, ui
 import user
 import asyncio
@@ -58,13 +58,12 @@ def signup_page():
     SignUpPage()
 
 @ui.page('/update')
-async def update_page():
-    ui.label('Updating Stock Data...')
-    spinner = ui.spinner()
-    chosen = await asyncio.to_thread(weekly_running.setup_stocks)
-    weekly_running.save_data(chosen)
-    spinner.delete()
-    ui.label('Update Complete')
+def update_page():
+    ui.label('Updater')
+    ui.label('Updating research...')
+    ui.spinner()
+    client = ui.context.client
+    asyncio.create_task(forward_update(client))
     
 @ui.page('/')
 def login_page():
