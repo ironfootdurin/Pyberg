@@ -8,6 +8,7 @@ import update
 import time
 import asyncio
 updater_started = False
+lock = asyncio.Lock()
 
 class Theme:
     def __init__(self):
@@ -65,11 +66,19 @@ async def forward_quarterly(ticker, client):
             ui.timer(5, lambda: path.unlink(missing_ok=True), once=True)
             
 async def forward_update(client):
-    loop = asyncio.get_event_loop()
-    path = await loop.run_in_executor(None, setup_stocks)
+    if lock.locked():
+        with client:
+            await client.connected()
+            ui.notify('Update already in progress')
+        return
+    
+    async with lock:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, setup_stocks)
 
     with client:
         await client.connected()
+        ui.notify('Update Complete')
         
 
 

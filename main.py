@@ -6,7 +6,6 @@ import asyncio
 from pathlib import Path
 import weekly_running
 
-lock = asyncio.Lock()
 
 @ui.page('/company/{ticker}')
 def company_page(ticker):
@@ -61,12 +60,11 @@ def signup_page():
 
 @ui.page('/update')
 async def update_page():
-    async with lock:
-        ui.label('Updater')
-        ui.label('Updating research...')
-        ui.spinner()
-        client = ui.context.client
-        asyncio.create_task(forward_update(client))
+    ui.label('Updater')
+    ui.label('Updating research...')
+    ui.spinner()
+    client = ui.context.client
+    asyncio.create_task(forward_update(client))
         
 @ui.page('/')
 def login_page():
