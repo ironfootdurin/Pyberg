@@ -8,6 +8,9 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 import cProfile
+import pstats
+import io
+
 
 start = time.time()
 
@@ -96,14 +99,15 @@ def get_dates():
 def benchmark():
     with sqlite3.connect('permanent.db') as conn:
         cursor = conn.cursor()
-        df = pd.read_sql_query('''
+        spy = pd.read_sql_query('''
                 SELECT ticker, close_price, history_date
                 FROM price_history_monthly
                 WHERE ticker = "SPY"''', conn)
-        df['history_date'] = pd.to_datetime(df['history_date'], format='%Y-%m-%d')
-        df = df.set_index('history_date')
-        return df
-
+        spy['history_date'] = pd.to_datetime(spy['history_date'], format='%Y-%m-%d')
+        spy['benchmark_return'] = (spy['close_price'].shift(-1) - spy['close_price']) / spy['close_price'] * 100
+        spy['date_index'] = range(len(spy))
+        spy = spy.set_index('date_index')
+        return spy
     
 def load_sp_500_data():
     with sqlite3.connect('S&P-500.db') as conn:
@@ -116,90 +120,54 @@ def load_sp_500_data():
         return df
 
 def time_machine(df, dates, n):
-    tables = []
-    for i, date in enumerate(dates):
-        
-        if i == 0 or i + n >= len(dates):
-            continue
-        current_date = dates.iloc[i]
-        current_info = df[df.index == current_date]
-        
-        prev_date = dates.iloc[i-1]
-        prev_info = df[df.index == prev_date]
-        
-        next_date = dates.iloc[i+n]
-        next_info = df[df.index == next_date]
+    print(' Pivoting table...')
+    df = df[df.index.isin(dates)]
+    pivot = df.pivot(columns='ticker', values='close_price')
+    print(' Shifting table data...')
+    old = pivot.shift(1)
+    nxt = pivot.shift(-n)
 
-        tables.append((current_info, prev_info, next_info))
+    print(' Reformatting table data...')
+    long = pivot.stack().reset_index()
+    long.columns = ['history_date', 'ticker', 'close_price']
+    long['close_price_old'] = old.stack().values
+    long['close_price_next'] = nxt.stack().values
+    print(' Getting table data performance...')
+    long['performance'] = (long['close_price'] - long['close_price_old']) / long['close_price_old'] * 100
+    long = long.dropna()
+    print(' Assigning values to dates...')
+    long['date_index'] = pd.factorize(long['history_date'])[0]
+    print(' Sorting values...')
+    return long.sort_values(['date_index', 'performance'])
 
-    return tables
-        
-def choose(merged, n, b):
-        chosen = merged.sort_values('performance').iloc[b:b+n]
-        chosen_list = chosen['ticker'].tolist()
-        return chosen_list, chosen
-    
-
-def test_time(tables, n, w, weight, df, b):
-    start1 = time.time()
-    chunks = []
-    chunk_size = max(1, 10 // w)
-    
-    for i in range(0, len(tables)-chunk_size, 1):
-        chunks.append(tables[i:i+chunk_size])
-    chosen_weights = [1]
-    #0.3, 0.3, 0.15, 0.15, 0.15
-    #stocks_culled = 0    
-
-    chosen_weights += [1] * (n - len(chosen_weights))
+def test_time(tables_numpy, n, w, weight, df, b):
+    #start1 = time.time()
+    benchmark_returns = df['benchmark_return'].values
     ttl_margins = []
-    for chunk in chunks:
-        margins = []
+    max_date_index = max(tables_numpy.keys())
+    #print(f'max_date_index: {max_date_index}')
+    for start in range(max_date_index - 9):
+        chunk = range(start, start + 10)
         changes = []
+        margins = []
         benchmark_changes = []
-        for date in chunk:
-            date1 = date[0].index[0]
-            date2 = date[2].index[0]
-            merged = pd.merge(date[1], date[0], on='ticker', suffixes=('_old', '_new'))
-            merged['performance'] = (merged['close_price_new'] - merged['close_price_old']) / merged['close_price_old'] * 100    
-
-            chosen_list, chosen = choose(merged, n, b)
-
-            result = date[2][date[2]['ticker'].isin(chosen_list)]
-
-            merged2 = pd.merge(result, chosen, on='ticker', suffixes=('_result', '_initial'))
-
-            merged2['result'] = (merged2['close_price'] - merged2['close_price_new']) / merged2['close_price_new'] * 100
+        for i in chunk:
+            close, close_next, perf = tables_numpy[i]
+            close = close[b:b+n]
+            close_next = close_next[b:b+n]
+            perf = perf[b:b+n]
             
-            merged2['weight'] = chosen_weights
+            result = (close_next - close) / close * 100
+            weight = np.abs(perf)
 
-            if weight:
-                merged2['weight'] = merged2['performance'].abs()
-                
+            change = np.average(result, weights=weight)
 
-            #before = len(merged2)
-            merged2 = merged2[merged2['result'].between(-50, 50)]
-            #after = len(merged2)
-
-            #stocks_culled += before - after
-
-            #if len(merged2) == 0:
-            #    continue
-
-            change = np.average(merged2['result'], weights=merged2['weight'])
-
-            dated_benchmark_start = df[df.index == date1]
-            dated_benchmark_end = df[df.index == date2]
-            benchmark_start_price = dated_benchmark_start['close_price'].iloc[0]
-            benchmark_end_price = dated_benchmark_end['close_price'].iloc[0]
-
-            benchmark_change = (benchmark_end_price - benchmark_start_price) / benchmark_start_price * 100
-
+            benchmark_change = benchmark_returns[i]
+            
             margin = change - benchmark_change
 
             #if benchmark_change >= 0:
             #    continue
-            
             #print(f'Margin over s&p: {margin}')
 
             changes.append(change)
@@ -215,44 +183,59 @@ def test_time(tables, n, w, weight, df, b):
         
         ttl_margins.append(average_margin)
 
-        print(f'COMPOUND MARGIN OVER S&P: {average_margin}')
+        #tqdm.write(f'COMPOUND MARGIN OVER S&P: {average_margin}')
         #print(f'Stocks culled: {stocks_culled}')
-    end1 = time.time()
-    print(f'test_time took {end1-start1:.2f} seconds')
-    return average_margin, changes, benchmark_changes, ttl_margins, chunks
+    #end1 = time.time()
+    #print(f'test_time took {end1-start1:.2f} seconds')
+    return average_margin, changes, benchmark_changes, ttl_margins
 
 
 
 def overnight_test():
+    print('Getting S&P tickers...')
     sp_list = get_sp500()
+    print('Sorting dates...')
     ticker_dates = sp_starting_dates()
+    print('Protecting data quality...')
     restore_data(sp_list, ticker_dates)
+    print('Getting S&P...')
     df = load_sp_500_data()
+    print('Getting verified dates...')
     dates = get_dates()
     margins_obtained = []
     margins_obtained_ultra = []
+    print('Getting Benchmark...')
     df2 = benchmark()
+    print('Preparing data for analysis')
     tables = time_machine(df, dates, 1)
-    tables = tables[len(tables)//2:]
-    for border in range (0, 75, 5):
-        for index in range(0, 100, 5):
-            if border >= index:
-                continue
-            try:
-                print(f'Testing value {index}')
-                margin, changes, benchmark_changes, ttl_margins, chunks = test_time(tables, index, 1, True, df2, border)
-                series = pd.Series(ttl_margins)
-                print(pd.Series(ttl_margins).describe())
-                pct_positive = (series > 0).mean() * 100
-                print(f'{pct_positive:.2f}% are above 0')
-                margins_obtained.append((index, series.median()))
-                downside_returns = np.minimum(series, 0)
-                down_std = np.sqrt(np.mean(downside_returns**2))
-                sortino = series.mean() / down_std
-                print(f'Sortino value: {sortino}')
-                margins_obtained_ultra.append((border, index, series.median(), series.mean(), pct_positive, sortino))
-            except Exception as e:
-                print(e)
+    tables = tables.set_index('date_index', drop=False)
+    print('Formatting for numpy...')
+    tables_numpy = {}
+    for i, group in tables.groupby(tables.index):
+        tables_numpy[i] = (
+            group['close_price'].values,
+            group['close_price_next'].values,
+            group['performance'].values
+        )
+    iterations = [(border, index) for border in range (0, 100)
+                                      for index in range(0, 100)
+                                      if border < index]
+    for border, index in tqdm(iterations, desc="Testing Strategy"):
+        try:
+            #tqdm.write(f'Testing value {index}')
+            margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, index, 1, True, df2, border)
+            series = pd.Series(ttl_margins)
+            #tqdm.write(str(pd.Series(ttl_margins).describe()))
+            pct_positive = (series > 0).mean() * 100
+            #tqdm.write(f'{pct_positive:.2f}% are above 0')
+            margins_obtained.append((index, series.median()))
+            downside_returns = np.minimum(series, 0)
+            down_std = np.sqrt(np.mean(downside_returns**2))
+            sortino = series.mean() / down_std
+            #tqdm.write(f'Sortino value: {sortino}')
+            margins_obtained_ultra.append((border, index, series.median(), series.mean(), pct_positive, sortino))
+        except Exception as e:
+            print(e)
     for item in margins_obtained:
         print(item)
     most_successful = max(margins_obtained_ultra, key=lambda item: item[2])
@@ -265,24 +248,37 @@ def overnight_test():
 
 
 def single_run():
+    print('Getting S&P tickers...')
     sp_list = get_sp500()
-     # get_sp_data(sp_list)
+    print('Sorting dates...')
     ticker_dates = sp_starting_dates()
+    print('Protecting data quality...')
     restore_data(sp_list, ticker_dates)
+    print('Getting S&P...')
     df = load_sp_500_data()
+    print('Getting verified dates...')
     dates = get_dates()
-    print(len(dates))
-    print(dates.nunique())
-    tables = time_machine(df, dates, 1)
-    tables = tables[len(tables)//2:]
+    margins_obtained = []
+    margins_obtained_ultra = []
+    print('Getting Benchmark...')
     df2 = benchmark()
-    number = 15
+    print('Preparing data for analysis')
+    tables = time_machine(df, dates, 1)
+    tables = tables.set_index('date_index', drop=False)
+    tables_numpy = {}
+    for i, group in tables.groupby(tables.index):
+        tables_numpy[i] = (
+            group['close_price'].values,
+            group['close_price_next'].values,
+            group['performance'].values
+        )
     number = input('How many stocks / week? ')
     print('Starting backtest...')
-    average_margin, changes, benchmark_changes, ttl_margins, chunks = test_time(tables, int(number), 1, True, df2, 3)
-    max_index = ttl_margins.index(min(ttl_margins))
-    print(chunks[max_index][0])
-    print(max_index)
+    pr = cProfile.Profile()
+    pr.enable()
+    test_time(tables_numpy, 70, 1, True, df2, 60)
+    pr.disable()
+    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 3)
     series = pd.Series(ttl_margins)
     print(series.describe())
     pct_positive = (series > 0).mean() * 100
@@ -297,13 +293,18 @@ def single_run():
     plt.xlabel('10-week outperformance %')
     plt.ylabel('Frequency')
     plt.show()
+    return pr
 
 
 if __name__ == '__main__':
 
     order = input('Order: ')
     if order == '1':
-        single_run()
+        pr = single_run()
+        stream = io.StringIO()
+        ps = pstats.Stats(pr, stream=stream).sort_stats('cumulative')
+        ps.print_stats(20)
+        print(stream.getvalue())
     else:  
         overnight_test()
 
