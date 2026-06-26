@@ -1,6 +1,10 @@
 import yfinance as yf
 import sqlite3
 import pandas as pd
+import time
+from datetime import timedelta
+
+start = time.time()
 
 def get_sp500():
     with sqlite3.connect('S&P-500.db') as conn:
@@ -20,18 +24,20 @@ def setup_stocks():
         progress=True,
         threads=True,
         )
-    for symbol in sp500:
-        print(f'Getting ticker {symbol}')
+    for i, symbol in enumerate(sp500):
+        print(f'Getting ticker {symbol}: ticker {i}/{len(sp500)}'.ljust(50), end='\r', flush=True)
+        #print(f'Getting ticker {symbol}: ticker {i}/{len(sp500)}')
         ticker = yf.Ticker(symbol)
         history = data[symbol]
         previous_price = history['Close'].iloc[-6]
         current_price = ticker.fast_info['last_price']
         change = (current_price - previous_price) / previous_price
-        weight = abs(change)
+        weight = abs(change) 
         prices.append((symbol, change, weight))
         
-    chosen_stocks = sorted(prices, key=lambda price: price[1], reverse=True)[:15]
+    chosen_stocks = sorted(prices, key=lambda price: price[1], reverse=True)[:32]
     save_data(chosen_stocks)
+    print(chosen_stocks)
     return True
 
 def save_data(chosen_stocks):
@@ -60,4 +66,8 @@ if __name__ == '__main__':
     setup_stocks()
         
 
-    
+end = time.time()
+h, r = divmod(end-start, 3600)
+m, s = divmod(r, 60)
+print(f'Operation took {h} hours {m} minutes and {s} seconds')
+input('Press enter to exit')
