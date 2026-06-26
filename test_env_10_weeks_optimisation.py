@@ -140,7 +140,7 @@ def time_machine(df, dates, n):
     print(' Sorting values...')
     return long.sort_values(['date_index', 'performance'])
 
-def test_time(tables_numpy, n, w, weight, df, b):
+def test_time(tables_numpy, n, w, weight, df, b, ratio):
     #start1 = time.time()
     benchmark_returns = df['benchmark_return'].values
     ttl_margins = []
@@ -158,13 +158,15 @@ def test_time(tables_numpy, n, w, weight, df, b):
             perf = perf[b:b+n]
             
             result = (close_next - close) / close * 100
+            
             weight = np.abs(perf)
+            #weight = np.ones(len(perf))
 
             change = np.average(result, weights=weight)
 
-            benchmark_change = benchmark_returns[i]
+            benchmark_change = benchmark_returns[i] * ratio
             
-            margin = change - benchmark_change
+            margin = change + benchmark_change * ratio
 
             #if benchmark_change >= 0:
             #    continue
@@ -177,13 +179,13 @@ def test_time(tables_numpy, n, w, weight, df, b):
         compound_strat = np.prod([(1+m/100) for m in changes]) - 1
         compound_bench = np.prod([(1+m/100) for m in benchmark_changes]) - 1
         
-        compound_return = compound_strat - compound_bench
+        compound_return = compound_strat + compound_bench
         #average_margin = sum(margins) / len(margins)
         average_margin = compound_return*100
         
         ttl_margins.append(average_margin)
 
-        #tqdm.write(f'COMPOUND MARGIN OVER S&P: {average_margin}')
+        #print(f'COMPOUND MARGIN OVER S&P: {average_margin}')
         #print(f'Stocks culled: {stocks_culled}')
     #end1 = time.time()
     #print(f'test_time took {end1-start1:.2f} seconds')
@@ -223,7 +225,7 @@ def overnight_test():
     for border, index in tqdm(iterations, desc="Testing Strategy"):
         try:
             #tqdm.write(f'Testing value {index}')
-            margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, index, 1, True, df2, border)
+            margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, index, 1, True, df2, border, -1)
             series = pd.Series(ttl_margins)
             #tqdm.write(str(pd.Series(ttl_margins).describe()))
             pct_positive = (series > 0).mean() * 100
@@ -273,12 +275,17 @@ def single_run():
             group['performance'].values
         )
     number = input('How many stocks / week? ')
+    number = 32
     print('Starting backtest...')
     pr = cProfile.Profile()
     pr.enable()
-    test_time(tables_numpy, 70, 1, True, df2, 60)
+    test_time(tables_numpy, 70, 1, True, df2, 0, -1)
     pr.disable()
-    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 3)
+    #for ratio in [x / 10 for x in range(-100, 100)]:
+    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 0, 0.85)
+        #series = pd.Series(ttl_margins)
+        #pct_positive = (series > 0).mean() * 100
+        #print(f'{ratio}: {pct_positive:.2f}% are above 0')
     series = pd.Series(ttl_margins)
     print(series.describe())
     pct_positive = (series > 0).mean() * 100
