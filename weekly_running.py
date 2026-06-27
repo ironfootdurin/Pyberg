@@ -4,7 +4,6 @@ import pandas as pd
 import time
 from datetime import timedelta
 
-start = time.time()
 
 def get_sp500():
     with sqlite3.connect('S&P-500.db') as conn:
@@ -17,28 +16,34 @@ def get_sp500():
 def setup_stocks():
     sp500 = get_sp500()
     prices = []
+    total_weight = 0
     data = yf.download(
         sp500,
         period='20d',
+        interval='1wk', 
         group_by='ticker',
         progress=True,
         threads=True,
         )
+    print(data)
     for i, symbol in enumerate(sp500):
-        print(f'Getting ticker {symbol}: ticker {i}/{len(sp500)}'.ljust(50), end='\r', flush=True)
-        #print(f'Getting ticker {symbol}: ticker {i}/{len(sp500)}')
-        ticker = yf.Ticker(symbol)
-        history = data[symbol]
-        previous_price = history['Close'].iloc[-6]
-        current_price = ticker.fast_info['last_price']
-        change = (current_price - previous_price) / previous_price
-        weight = abs(change) 
-        prices.append((symbol, change, weight))
-        
-    chosen_stocks = sorted(prices, key=lambda price: price[1], reverse=True)[:32]
+        try:
+            print(f'Getting ticker {symbol}: ticker {i}/{len(sp500)}'.ljust(50), end='\r', flush=True)
+            #print(f'Getting ticker {symbol}: ticker {i}/{len(sp500)}')
+            ticker = yf.Ticker(symbol)
+            history = data[symbol]
+            previous_price = history['Close'].iloc[-2]
+            
+            current_price = ticker.fast_info['last_price']
+            change = (current_price - previous_price) / previous_price
+            weight = abs(change)
+            prices.append((symbol, change, weight, current_price))
+        except Exception as e:
+            print(e)
+    chosen_stocks = sorted(prices, key=lambda price: price[1])[:32]
     save_data(chosen_stocks)
-    print(chosen_stocks)
-    return True
+    total_weight = sum(item[2] for item in chosen_stocks)
+    return chosen_stocks, total_weight
 
 def save_data(chosen_stocks):
     
@@ -63,11 +68,13 @@ def retrieve_data():
         return data
 
 if __name__ == '__main__':
-    setup_stocks()
+    start = time.time()
+    stocks, total_weight = setup_stocks()
+    end = time.time()
+    h, r = divmod(end-start, 3600)
+    m, s = divmod(r, 60)
+    print(f'Operation took {h} hours {m} minutes and {s} seconds')
+    input('Press enter to exit')
+        
         
 
-end = time.time()
-h, r = divmod(end-start, 3600)
-m, s = divmod(r, 60)
-print(f'Operation took {h} hours {m} minutes and {s} seconds')
-input('Press enter to exit')
