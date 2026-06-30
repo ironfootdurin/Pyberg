@@ -141,6 +141,8 @@ def time_machine(df, dates, n):
     return long.sort_values(['date_index', 'performance'])
 
 def test_time(tables_numpy, n, w, weight, df, b, ratio):
+    
+    correlation = []
     #start1 = time.time()
     benchmark_returns = df['benchmark_return'].values
     ttl_margins = []
@@ -159,17 +161,21 @@ def test_time(tables_numpy, n, w, weight, df, b, ratio):
             
             result = (close_next - close) / close * 100
             
-            weight = np.abs(perf)
-            #weight = np.ones(len(perf))
+            #weight = np.abs(perf)
+            weight = np.ones(len(perf))
 
             change = np.average(result, weights=weight)
 
-            benchmark_change = benchmark_returns[i] * ratio
+            benchmark_change = benchmark_returns[i]
+
+            #if benchmark_change < 0:
+            #    continue
+            #correlation.append((change, benchmark_change))
+
+            benchmark_change = benchmark_change
+            #* ratio
             
             margin = change + benchmark_change * ratio
-
-            #if benchmark_change >= 0:
-            #    continue
             #print(f'Margin over s&p: {margin}')
 
             changes.append(change)
@@ -185,15 +191,24 @@ def test_time(tables_numpy, n, w, weight, df, b, ratio):
         
         ttl_margins.append(average_margin)
 
+        correlation.append((compound_strat, compound_bench))
+
         #print(f'COMPOUND MARGIN OVER S&P: {average_margin}')
         #print(f'Stocks culled: {stocks_culled}')
     #end1 = time.time()
     #print(f'test_time took {end1-start1:.2f} seconds')
+
+    pd.DataFrame(correlation, columns=['strategy', 'S&P500']).to_csv('correlation2.csv', index=False)
+    sp500 = np.array([x[0] for x in correlation ])
+    returns = np.array([x[1] for x in correlation ])
+    beta = np.cov(returns, sp500, ddof=1)[0, 1] / np.var(sp500, ddof=1)
+    print(beta)
     return average_margin, changes, benchmark_changes, ttl_margins
 
 
 
 def overnight_test():
+    
     print('Getting S&P tickers...')
     sp_list = get_sp500()
     print('Sorting dates...')
@@ -206,6 +221,7 @@ def overnight_test():
     dates = get_dates()
     margins_obtained = []
     margins_obtained_ultra = []
+    correlation = []
     print('Getting Benchmark...')
     df2 = benchmark()
     print('Preparing data for analysis')
@@ -219,13 +235,16 @@ def overnight_test():
             group['close_price_next'].values,
             group['performance'].values
         )
-    iterations = [(border, index) for border in range (0, 100)
-                                      for index in range(0, 100)
-                                      if border < index]
-    for border, index in tqdm(iterations, desc="Testing Strategy"):
+    #iterations = [(border, index) for border in range (0, 0)
+    #                                  for index in range(0, 100)
+    #                                  if border < index]
+    #for border, index in tqdm(iterations, desc="Testing Strategy"):
+    border = 0
+    for ratio in [x / 10 for x in range(-100, 100)]:
         try:
+            index = ratio
             #tqdm.write(f'Testing value {index}')
-            margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, index, 1, True, df2, border, -1)
+            margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, 32, 1, True, df2, border, ratio)
             series = pd.Series(ttl_margins)
             #tqdm.write(str(pd.Series(ttl_margins).describe()))
             pct_positive = (series > 0).mean() * 100
@@ -233,16 +252,20 @@ def overnight_test():
             margins_obtained.append((index, series.median()))
             downside_returns = np.minimum(series, 0)
             down_std = np.sqrt(np.mean(downside_returns**2))
-            sortino = series.mean() / down_std
+            if down_std != 0:
+                sortino = series.mean() / down_std
+            else:
+                sortino = 0
             #tqdm.write(f'Sortino value: {sortino}')
             margins_obtained_ultra.append((border, index, series.median(), series.mean(), pct_positive, sortino))
+            print(f'{ratio}: {pct_positive}')
         except Exception as e:
             print(e)
     for item in margins_obtained:
         print(item)
     most_successful = max(margins_obtained_ultra, key=lambda item: item[2])
 
-    pd.DataFrame(margins_obtained_ultra, columns=['border', 'n', 'median', 'mean', 'win_rate', 'sortino']).to_csv('results_positive.csv', index=False)
+    pd.DataFrame(margins_obtained_ultra, columns=['border', 'n', 'median', 'mean', 'win_rate', 'sortino']).to_csv('results_positive_ratio_getting2.csv', index=False)
     print(f'MOST SUCCESSFULL: {most_successful}')
     
 
@@ -274,7 +297,7 @@ def single_run():
             group['close_price_next'].values,
             group['performance'].values
         )
-    number = input('How many stocks / week? ')
+    #number = input('How many stocks / week? ')
     number = 32
     print('Starting backtest...')
     pr = cProfile.Profile()
@@ -282,7 +305,7 @@ def single_run():
     test_time(tables_numpy, 70, 1, True, df2, 0, -1)
     pr.disable()
     #for ratio in [x / 10 for x in range(-100, 100)]:
-    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 0, 0.85)
+    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 0, 0)
         #series = pd.Series(ttl_margins)
         #pct_positive = (series > 0).mean() * 100
         #print(f'{ratio}: {pct_positive:.2f}% are above 0')

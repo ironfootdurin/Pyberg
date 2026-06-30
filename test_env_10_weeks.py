@@ -8,6 +8,8 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 import cProfile
+import pstats
+import io
 
 start = time.time()
 
@@ -279,7 +281,15 @@ def single_run():
     number = 15
     number = input('How many stocks / week? ')
     print('Starting backtest...')
-    average_margin, changes, benchmark_changes, ttl_margins, chunks = test_time(tables, int(number), 1, True, df2, 3)
+    pr = cProfile.Profile()
+    pr.enable()
+    test_time(tables, int(number), 1, True, df2, 0)
+    pr.disable()
+    stream = io.StringIO()
+    ps = pstats.Stats(pr, stream=stream).sort_stats('cumulative')
+    ps.print_stats(20)
+    print(stream.getvalue())
+    average_margin, changes, benchmark_changes, ttl_margins, chunks = test_time(tables, int(number), 1, True, df2, 0)
     max_index = ttl_margins.index(min(ttl_margins))
     print(chunks[max_index][0])
     print(max_index)

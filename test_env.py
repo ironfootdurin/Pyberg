@@ -151,7 +151,7 @@ def test_time(tables, n):
     chosen_weights += [1] * (n - len(chosen_weights))
 
     
-    for date in tables[-10:]:
+    for date in tables:
         date1 = date[0].index[0]
         date2 = date[2].index[0]
         merged = pd.merge(date[1], date[0], on='ticker', suffixes=('_old', '_new'))
@@ -239,7 +239,7 @@ def single_run():
     print(len(dates))
     print(dates.nunique())
     tables = time_machine(df, dates)
-    average_margin, changes, benchmark_changes = test_time(tables, 18)
+    average_margin, changes, benchmark_changes = test_time(tables, 20)
     
     plt.plot(changes, label='Performance')
     plt.plot(benchmark_changes, label='Benchmark')
