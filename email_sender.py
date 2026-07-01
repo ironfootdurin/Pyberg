@@ -13,7 +13,7 @@ if __name__ == '__main__':
         for stock in stocks:
             
             ticker = stock[0]
-            score = (0.4 * stock[2]) / (total_weight * stock[3])
+            score = ((0.66 * stock[2]) / (total_weight * stock[3])) * 100000
             data.append([ticker, score])
             
         
@@ -23,7 +23,7 @@ if __name__ == '__main__':
             tablefmt="plain"
             )
         print(email_text)
-        yag = yagmail.SMTP('pyberg@gmail.com', 'cwqt tcid fjtl yktr')
+        yag = yagmail.SMTP('pyberg.server@gmail.com', 'cwqt tcid fjtl yktr')
         yag.send(
             to='arthur.mourot@gmail.com',
             subject='Stocks to invest in', 

@@ -305,7 +305,7 @@ def single_run():
     test_time(tables_numpy, 70, 1, True, df2, 0, -1)
     pr.disable()
     #for ratio in [x / 10 for x in range(-100, 100)]:
-    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 0, 0)
+    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 0, -0.5)
         #series = pd.Series(ttl_margins)
         #pct_positive = (series > 0).mean() * 100
         #print(f'{ratio}: {pct_positive:.2f}% are above 0')
