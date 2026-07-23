@@ -47,4 +47,3 @@ if __name__ == '__main__':
             print(f' {n}/500: Success!')
         else:
             print('Failed')
-        save(ticker)

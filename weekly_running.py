@@ -13,7 +13,7 @@ def get_sp500():
         sp500 = [c[0] for c in sp500]
         return sp500
 
-def setup_stocks():
+def online_run():
     sp500 = get_sp500()
     prices = []
     total_weight = 0
@@ -53,7 +53,8 @@ def save_data(chosen_stocks):
             CREATE TABLE IF NOT EXISTS recent_data (
                 ticker TEXT PRIMARY KEY,
                 change REAL,
-                weight REAL
+                weight REAL,
+                price REAL
                 )
             ''')
         for stocks in chosen_stocks:
@@ -66,10 +67,20 @@ def retrieve_data():
         cursor.execute('SELECT ticker, change, weight FROM recent_data')
         data = cursor.fetchall()
         return data
+    
+def offline_run():
+    with sqlite3.connect('weekly_running.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT ticker, change, weight, price FROM recent_data')
+        data = cursor.fetchall()
+    total_weight = sum(item[2] for item in chosen_stocks)
+    return chosen_stocks, total_weight
+    
+    
 
 if __name__ == '__main__':
     start = time.time()
-    stocks, total_weight = setup_stocks()
+    stocks, total_weight = online_run()
     end = time.time()
     h, r = divmod(end-start, 3600)
     m, s = divmod(r, 60)

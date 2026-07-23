@@ -145,6 +145,7 @@ def test_time(tables_numpy, n, w, weight, df, b, ratio):
     correlation = []
     #start1 = time.time()
     benchmark_returns = df['benchmark_return'].values
+    df = pd.read_csv('beta.csv')
     ttl_margins = []
     max_date_index = max(tables_numpy.keys())
     #print(f'max_date_index: {max_date_index}')
@@ -161,8 +162,8 @@ def test_time(tables_numpy, n, w, weight, df, b, ratio):
             
             result = (close_next - close) / close * 100
             
-            #weight = np.abs(perf)
-            weight = np.ones(len(perf))
+            weight = np.abs(perf)
+            #weight = np.ones(len(perf))
 
             change = np.average(result, weights=weight)
 
@@ -201,8 +202,7 @@ def test_time(tables_numpy, n, w, weight, df, b, ratio):
     pd.DataFrame(correlation, columns=['strategy', 'S&P500']).to_csv('correlation2.csv', index=False)
     sp500 = np.array([x[0] for x in correlation ])
     returns = np.array([x[1] for x in correlation ])
-    beta = np.cov(returns, sp500, ddof=1)[0, 1] / np.var(sp500, ddof=1)
-    print(beta)
+
     return average_margin, changes, benchmark_changes, ttl_margins
 
 
@@ -305,7 +305,7 @@ def single_run():
     test_time(tables_numpy, 70, 1, True, df2, 0, -1)
     pr.disable()
     #for ratio in [x / 10 for x in range(-100, 100)]:
-    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 0, -0.5)
+    average_margin, changes, benchmark_changes, ttl_margins = test_time(tables_numpy, int(number), 1, True, df2, 0, -0.7)
         #series = pd.Series(ttl_margins)
         #pct_positive = (series > 0).mean() * 100
         #print(f'{ratio}: {pct_positive:.2f}% are above 0')
