@@ -1,6 +1,6 @@
 from nicegui import app, ui, Client
 from report import get_quarterly
-from weekly_running import setup_stocks
+from weekly_running import online_run
 import os
 import threading
 import find
@@ -74,7 +74,7 @@ async def forward_update(client):
     print('Updating')
     async with lock:
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, setup_stocks)
+        await loop.run_in_executor(None, online_run)
 
     with client:
         await client.connected()
